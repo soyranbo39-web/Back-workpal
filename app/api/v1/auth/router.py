@@ -5,6 +5,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import (
 	AUTH_COOKIE_NAME,
+	AUTH_COOKIE_HTTPONLY,
+	AUTH_COOKIE_SAMESITE,
 	AUTH_COOKIE_SECURE,
 	AUTH_TOKEN_EXPIRE_MINUTES,
 )
@@ -46,18 +48,18 @@ def login(response: Response, form: Annotated[OAuth2PasswordRequestForm, Depends
 	response.set_cookie(
 		key=AUTH_COOKIE_NAME,
 		value=token,
-		httponly=True,
+		httponly=AUTH_COOKIE_HTTPONLY,
 		secure=AUTH_COOKIE_SECURE,
-		samesite="lax",
+		samesite=AUTH_COOKIE_SAMESITE,
 		max_age=AUTH_TOKEN_EXPIRE_MINUTES * 60,
 	)
 	return AuthOut(
 		access_token=token,
 		cookie=CookieMetaOut(
 			name=AUTH_COOKIE_NAME,
-			http_only=True,
+			http_only=AUTH_COOKIE_HTTPONLY,
 			secure=AUTH_COOKIE_SECURE,
-			same_site="lax",
+			same_site=AUTH_COOKIE_SAMESITE,
 			max_age_seconds=AUTH_TOKEN_EXPIRE_MINUTES * 60,
 		),
 	)

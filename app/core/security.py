@@ -17,7 +17,7 @@ from app.core.config import (
 )
 
 api_key_header = APIKeyHeader(name=API_KEY_HEADER_NAME, auto_error=False)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 _revoked_jtis: set[str] = set()
