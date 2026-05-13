@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.api.v1.Alumnos.repository import PostRepository
+from app.api.v1.Alumnos.repository import AlumnoRepository
 from app.core.db import get_db
 from app.core.security import get_current_user
 from app.services.file_storage import save_uploaded_image
@@ -19,7 +19,7 @@ router = APIRouter(
 )
 @router.get("/{alumno_id}", response_model=AlumnoResponse)
 async def get_alumno(alumno_id: int, db: Annotated[Session, Depends(get_db)]):
-    repo = PostRepository(db)
+    repo = AlumnoRepository(db)
     alumno = repo.get_alumno_by_id(alumno_id)
     if alumno is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alumno no encontrado")
@@ -28,7 +28,7 @@ async def get_alumno(alumno_id: int, db: Annotated[Session, Depends(get_db)]):
 
 @router.get("/", response_model=list[AlumnoResponse])
 async def list_alumnos(db: Annotated[Session, Depends(get_db)]):
-    repo = PostRepository(db)
+    repo = AlumnoRepository(db)
     return repo.list_alumnos()
 
 
@@ -40,7 +40,7 @@ async def create_alumno(
     db: Annotated[Session, Depends(get_db)] = None,
     user: Annotated[dict, Depends(get_current_user)] = None,
 ):
-    repo = PostRepository(db)
+    repo = AlumnoRepository(db)
     saved : Optional[dict[str, str]] = None
     try:
         if imagen is not None:
@@ -71,7 +71,7 @@ async def create_alumno(
             
 @router.delete("/{alumno_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_alumno(alumno_id: int, db: Annotated[Session, Depends(get_db)]):
-    repo = PostRepository(db)
+    repo = AlumnoRepository(db)
     alumno = repo.get_alumno_by_id(alumno_id)
     if alumno is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alumno no encontrado")
@@ -85,7 +85,7 @@ async def update_alumno(
     imagen: Annotated[Optional[UploadFile], File()] = None,
     db: Annotated[Session, Depends(get_db)] = None,
 ):
-    repo = PostRepository(db)
+    repo = AlumnoRepository(db)
     alumno = repo.get_alumno_by_id(alumno_id)
     if alumno is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alumno no encontrado")

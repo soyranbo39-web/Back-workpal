@@ -1,10 +1,10 @@
 from sqlalchemy.orm import Session
 
-from app.api.v1.Alumnos.schemas import AlumnoCreate, AlumnoResponse
+from app.api.v1.Alumnos.schemas import AlumnoCreate
 from app.models.Alumnos import Alumno
 
 
-class PostRepository:
+class AlumnoRepository:
 
     def __init__(self, db: Session):
         self.db = db
@@ -18,3 +18,28 @@ class PostRepository:
         )
         self.db.add(new_alumno)
         return new_alumno
+
+    def get_alumno_by_id(self, alumno_id: int) -> Alumno | None:
+        return (
+            self.db.query(Alumno)
+            .filter(Alumno.id == alumno_id)
+            .first()
+        )
+
+    def list_alumnos(self) -> list[Alumno]:
+        return self.db.query(Alumno).all()
+
+    def delete_alumno(self, alumno: Alumno):
+        self.db.delete(alumno)
+
+    def update_alumno(
+        self,
+        alumno: Alumno,
+        alumno_data: AlumnoCreate
+    ) -> Alumno:
+        alumno.name = alumno_data.name
+        alumno.last_name = alumno_data.last_name
+        alumno.carrera = alumno_data.carrera
+        alumno.imagen_url = alumno_data.imagen_url
+
+        return alumno
