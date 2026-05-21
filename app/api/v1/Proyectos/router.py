@@ -5,8 +5,10 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.v1.Proyectos.repository import ProyectoRepository
-from app.api.v1.Proyectos.schemas import ProyectoCreate, ProyectoResponse
+from app.api.v1.Alumnos.repository import AlumnoRepository
+from app.api.v1.Proyectos.schemas import ProyectoCreate, ProyectoResponse, ProyectoAlumnoResponse
 from app.core.db import get_db
+from app.core.security import get_current_user
 
 router = APIRouter(
     prefix="/proyectos",
@@ -37,12 +39,32 @@ async def list_proyectos(
     repo = ProyectoRepository(db)
     return repo.list_proyectos()
 
+@router.get("/mis-proyectos", response_model=list[ProyectoResponse])
+async def list_mis_proyectos(
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Perfil de alumno no encontrado")
+    
+    repo = ProyectoRepository(db)
+    return repo.list_proyectos_by_owner(alumno.id)
+
 @router.post("/", response_model=ProyectoResponse)
 async def create_proyecto(
     proyecto: ProyectoCreate,
     db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
 ):
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Perfil de alumno no encontrado")
+
     repo = ProyectoRepository(db)
+    proyecto.owner_id = alumno.id
 
     try:
         created_proyecto = repo.create_proyecto(proyecto)
@@ -65,6 +87,98 @@ async def create_proyecto(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al crear el proyecto"
         )
+
+@router.post("/{proyecto_id}/aplicar", response_model=ProyectoAlumnoResponse)
+async def aplicar_a_proyecto(
+    proyecto_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Perfil de alumno no encontrado")
+
+    repo = ProyectoRepository(db)
+    proyecto = repo.get_proyecto_by_id(proyecto_id)
+    if not proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    if proyecto.owner_id == alumno.id:
+        raise HTTPException(status_code=400, detail="No puedes aplicar a tu propio proyecto")
+
+    try:
+        application = repo.apply_to_project(proyecto_id, alumno.id)
+        db.commit()
+        db.refresh(application)
+        return application
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Ya has aplicado a este proyecto")
+
+@router.get("/{proyecto_id}/aplicaciones", response_model=list[ProyectoAlumnoResponse])
+async def list_aplicaciones(
+    proyecto_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    repo = ProyectoRepository(db)
+    proyecto = repo.get_proyecto_by_id(proyecto_id)
+    if not proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not alumno or proyecto.owner_id != alumno.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver las aplicaciones de este proyecto")
+
+    return repo.get_applications_by_project(proyecto_id)
+
+@router.post("/aplicaciones/{application_id}/aceptar", response_model=ProyectoAlumnoResponse)
+async def aceptar_aplicacion(
+    application_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    repo = ProyectoRepository(db)
+    application = repo.get_application_by_id(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Aplicación no encontrada")
+    
+    proyecto = repo.get_proyecto_by_id(application.proyecto_id)
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    
+    if not alumno or proyecto.owner_id != alumno.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para aceptar aplicaciones en este proyecto")
+
+    repo.update_application_status(application, "accepted")
+    db.commit()
+    db.refresh(application)
+    return application
+
+@router.post("/aplicaciones/{application_id}/rechazar", response_model=ProyectoAlumnoResponse)
+async def rechazar_aplicacion(
+    application_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    repo = ProyectoRepository(db)
+    application = repo.get_application_by_id(application_id)
+    if not application:
+        raise HTTPException(status_code=404, detail="Aplicación no encontrada")
+    
+    proyecto = repo.get_proyecto_by_id(application.proyecto_id)
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    
+    if not alumno or proyecto.owner_id != alumno.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para rechazar aplicaciones en este proyecto")
+
+    repo.update_application_status(application, "rejected")
+    db.commit()
+    db.refresh(application)
+    return application
 
 @router.put("/{proyecto_id}", response_model=ProyectoResponse)
 async def update_proyecto(

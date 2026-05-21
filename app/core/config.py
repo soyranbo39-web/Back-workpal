@@ -15,10 +15,12 @@ class Settings(BaseSettings):
     SQLITE_DB_PATH: str
     API_KEY_HEADER_NAME: str
     API_KEY_VALUE: str
+    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore"
     )
 
 settings = Settings()

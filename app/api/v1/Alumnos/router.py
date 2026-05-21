@@ -56,7 +56,8 @@ async def create_alumno(
                 last_name=alumno.last_name,
                 carrera=alumno.carrera,
                 imagen_url=imagen_url
-            )
+            ),
+            user_id=user
         )
         db.commit()
         db.refresh(created_post)
