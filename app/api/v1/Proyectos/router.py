@@ -16,6 +16,19 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+@router.get("/mis-proyectos", response_model=list[ProyectoResponse])
+async def list_mis_proyectos(
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Perfil de alumno no encontrado")
+    
+    repo = ProyectoRepository(db)
+    return repo.list_proyectos_by_owner(alumno.id)
+
 @router.get("/{proyecto_id}", response_model=ProyectoResponse)
 async def get_proyecto(
     proyecto_id: int,
@@ -38,19 +51,6 @@ async def list_proyectos(
 ):
     repo = ProyectoRepository(db)
     return repo.list_proyectos()
-
-@router.get("/mis-proyectos", response_model=list[ProyectoResponse])
-async def list_mis_proyectos(
-    db: Annotated[Session, Depends(get_db)],
-    user_id: Annotated[str, Depends(get_current_user)]
-):
-    alumno_repo = AlumnoRepository(db)
-    alumno = alumno_repo.get_alumno_by_user_id(user_id)
-    if not alumno:
-        raise HTTPException(status_code=404, detail="Perfil de alumno no encontrado")
-    
-    repo = ProyectoRepository(db)
-    return repo.list_proyectos_by_owner(alumno.id)
 
 @router.post("/", response_model=ProyectoResponse)
 async def create_proyecto(
