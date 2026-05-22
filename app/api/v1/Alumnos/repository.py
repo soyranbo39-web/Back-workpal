@@ -14,6 +14,7 @@ class AlumnoRepository:
             name=alumno.name,
             last_name=alumno.last_name,
             carrera=alumno.carrera,
+            skills=alumno.skills,
             imagen_url=getattr(alumno, "imagen_url", ""),
             user_id=user_id
         )
@@ -48,6 +49,7 @@ class AlumnoRepository:
         alumno.name = alumno_data.name
         alumno.last_name = alumno_data.last_name
         alumno.carrera = alumno_data.carrera
+        alumno.skills = alumno_data.skills
         alumno.imagen_url = alumno_data.imagen_url
 
         return alumno

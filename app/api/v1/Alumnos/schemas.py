@@ -9,6 +9,7 @@ class AlumnoCreate(BaseModel):
     name: str
     last_name: str
     carrera: str
+    skills: str = ""
     imagen_url: str = ""
 
     @classmethod
@@ -17,14 +18,16 @@ class AlumnoCreate(BaseModel):
         name: Annotated[str, Form()],
         last_name: Annotated[str, Form()],
         carrera: Annotated[str, Form()],
+        skills: Annotated[str, Form()] = "",
     ) -> "AlumnoCreate":
-        return cls(name=name, last_name=last_name, carrera=carrera)
+        return cls(name=name, last_name=last_name, carrera=carrera, skills=skills)
 
 class AlumnoResponse(BaseModel):
     id: int
     name: str
     last_name: str
     carrera: str
+    skills: str = ""
     imagen_url: str = ""
 
     class Config:

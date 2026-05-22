@@ -116,7 +116,7 @@ async def aplicar_a_proyecto(
         db.rollback()
         raise HTTPException(status_code=400, detail="Ya has aplicado a este proyecto")
 
-@router.get("/{proyecto_id}/aplicaciones", response_model=list[ProyectoAlumnoResponse])
+@router.get("/{proyecto_id}/aplicaciones", response_model=list[dict])
 async def list_aplicaciones(
     proyecto_id: int,
     db: Annotated[Session, Depends(get_db)],
@@ -128,11 +128,48 @@ async def list_aplicaciones(
         raise HTTPException(status_code=404, detail="Proyecto no encontrado")
     
     alumno_repo = AlumnoRepository(db)
-    alumno = alumno_repo.get_alumno_by_user_id(user_id)
-    if not alumno or proyecto.owner_id != alumno.id:
+    me_alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not me_alumno or proyecto.owner_id != me_alumno.id:
         raise HTTPException(status_code=403, detail="No tienes permiso para ver las aplicaciones de este proyecto")
 
-    return repo.get_applications_by_project(proyecto_id)
+    # Get applications and join with Alumno to get their names
+    apps = repo.get_applications_by_project(proyecto_id)
+    result = []
+    for app in apps:
+        app_alumno = alumno_repo.get_alumno_by_id(app.alumno_id)
+        result.append({
+            "id": app.id,
+            "proyecto_id": app.proyecto_id,
+            "alumno_id": app.alumno_id,
+            "status": app.status,
+            "alumno_name": f"{app_alumno.name} {app_alumno.last_name}" if app_alumno else "Desconocido",
+            "alumno_carrera": app_alumno.carrera if app_alumno else ""
+        })
+    return result
+
+@router.get("/{proyecto_id}/colaboradores", response_model=list[dict])
+async def list_colaboradores(
+    proyecto_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    repo = ProyectoRepository(db)
+    proyecto = repo.get_proyecto_by_id(proyecto_id)
+    if not proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    
+    alumno_repo = AlumnoRepository(db)
+    colabs = repo.get_collaborators_by_project(proyecto_id)
+    result = []
+    for col in colabs:
+        col_alumno = alumno_repo.get_alumno_by_id(col.alumno_id)
+        result.append({
+            "id": col.id,
+            "alumno_id": col.alumno_id,
+            "alumno_name": f"{col_alumno.name} {col_alumno.last_name}" if col_alumno else "Desconocido",
+            "alumno_carrera": col_alumno.carrera if col_alumno else "",
+            "imagen_url": col_alumno.imagen_url if col_alumno else ""
+        })
+    return result
 
 @router.post("/aplicaciones/{application_id}/aceptar", response_model=ProyectoAlumnoResponse)
 async def aceptar_aplicacion(

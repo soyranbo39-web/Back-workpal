@@ -17,6 +17,18 @@ router = APIRouter(
     tags=["alumnos"],
     responses={404: {"description": "Not found"}},
 )
+@router.get("/me", response_model=AlumnoResponse)
+async def get_alumno_me(
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    repo = AlumnoRepository(db)
+    alumno = repo.get_alumno_by_user_id(user_id)
+    if alumno is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Perfil de alumno no encontrado")
+    return alumno
+
+
 @router.get("/{alumno_id}", response_model=AlumnoResponse)
 async def get_alumno(alumno_id: int, db: Annotated[Session, Depends(get_db)]):
     repo = AlumnoRepository(db)

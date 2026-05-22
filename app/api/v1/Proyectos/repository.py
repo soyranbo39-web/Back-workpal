@@ -70,7 +70,14 @@ class ProyectoRepository:
     def get_applications_by_project(self, proyecto_id: int) -> list[ProyectoAlumno]:
         return (
             self.db.query(ProyectoAlumno)
-            .filter(ProyectoAlumno.proyecto_id == proyecto_id)
+            .filter(ProyectoAlumno.proyecto_id == proyecto_id, ProyectoAlumno.status == "pending")
+            .all()
+        )
+
+    def get_collaborators_by_project(self, proyecto_id: int) -> list[ProyectoAlumno]:
+        return (
+            self.db.query(ProyectoAlumno)
+            .filter(ProyectoAlumno.proyecto_id == proyecto_id, ProyectoAlumno.status == "accepted")
             .all()
         )
 
