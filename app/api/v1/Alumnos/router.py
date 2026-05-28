@@ -67,6 +67,7 @@ async def create_alumno(
                 name=alumno.name,
                 last_name=alumno.last_name,
                 carrera=alumno.carrera,
+                skills=alumno.skills,
                 imagen_url=imagen_url
             ),
             user_id=user
