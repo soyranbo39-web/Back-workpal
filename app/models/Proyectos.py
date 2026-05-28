@@ -22,3 +22,4 @@ class Proyecto(Base):
         secondary="ProyectoAlumno",
         back_populates="lista_proyectos"
     )
+    tareas: Mapped[list["Tarea"]] = relationship("Tarea", back_populates="proyecto")

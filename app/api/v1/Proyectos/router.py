@@ -10,11 +10,101 @@ from app.api.v1.Proyectos.schemas import ProyectoCreate, ProyectoResponse, Proye
 from app.core.db import get_db
 from app.core.security import get_current_user
 
+from app.api.v1.Tareas.repository import TareaRepository
+
 router = APIRouter(
     prefix="/proyectos",
     tags=["proyectos"],
     responses={404: {"description": "Not found"}},
 )
+
+@router.get("/unidos", response_model=list[ProyectoResponse])
+async def list_unidos(
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    alumno_repo = AlumnoRepository(db)
+    alumno = alumno_repo.get_alumno_by_user_id(user_id)
+    if not alumno:
+        raise HTTPException(status_code=404, detail="Perfil de alumno no encontrado")
+    
+    repo = ProyectoRepository(db)
+    return repo.list_proyectos_unidos(alumno.id)
+
+@router.post("/{proyecto_id}/abandonar")
+async def abandonar_proyecto(
+    proyecto_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    alumno_repo = AlumnoRepository(db)
+    me = alumno_repo.get_alumno_by_user_id(user_id)
+    if not me:
+        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+
+    tarea_repo = TareaRepository(db)
+    tareas = tarea_repo.get_tareas_by_proyecto_and_alumno(proyecto_id, me.id)
+    
+    # Check if all tasks are 'Confirmada'
+    not_confirmed = [t for t in tareas if t.status != "Confirmada"]
+    if not_confirmed:
+        raise HTTPException(status_code=400, detail="No puedes abandonar el proyecto hasta que todas tus tareas estén confirmadas")
+
+    proy_repo = ProyectoRepository(db)
+    app = proy_repo.request_exit(proyecto_id, me.id)
+    if not app:
+        raise HTTPException(status_code=404, detail="No eres colaborador de este proyecto")
+    
+    db.commit()
+    return {"message": "Solicitud de salida enviada"}
+
+@router.get("/{proyecto_id}/solicitudes-salida")
+async def list_solicitudes_salida(
+    proyecto_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    proy_repo = ProyectoRepository(db)
+    proyecto = proy_repo.get_proyecto_by_id(proyecto_id)
+    alumno_repo = AlumnoRepository(db)
+    me = alumno_repo.get_alumno_by_user_id(user_id)
+    
+    if not me or proyecto.owner_id != me.id:
+        raise HTTPException(status_code=403, detail="Solo el administrador puede ver solicitudes de salida")
+
+    reqs = proy_repo.get_exit_requests_by_project(proyecto_id)
+    result = []
+    for r in reqs:
+        al = alumno_repo.get_alumno_by_id(r.alumno_id)
+        result.append({
+            "id": r.id,
+            "alumno_id": r.alumno_id,
+            "alumno_name": f"{al.name} {al.last_name}" if al else "Desconocido"
+        })
+    return result
+
+@router.post("/solicitudes-salida/{application_id}/procesar")
+async def procesar_salida(
+    application_id: int,
+    accept: bool,
+    db: Annotated[Session, Depends(get_db)],
+    user_id: Annotated[str, Depends(get_current_user)]
+):
+    proy_repo = ProyectoRepository(db)
+    app = proy_repo.get_application_by_id(application_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+    
+    proyecto = proy_repo.get_proyecto_by_id(app.proyecto_id)
+    alumno_repo = AlumnoRepository(db)
+    me = alumno_repo.get_alumno_by_user_id(user_id)
+    
+    if not me or proyecto.owner_id != me.id:
+        raise HTTPException(status_code=403, detail="Solo el administrador puede procesar solicitudes de salida")
+
+    proy_repo.process_exit(app, accept)
+    db.commit()
+    return {"message": "Solicitud procesada" if accept else "Solicitud rechazada"}
 
 @router.get("/mis-proyectos", response_model=list[ProyectoResponse])
 async def list_mis_proyectos(

@@ -9,6 +9,7 @@ from app.uploads.router import router as upload_router
 from app.api.v1.auth.router import auth_router
 from app.api.v1.Alumnos.router import router as alumno_router
 from app.api.v1.Proyectos.router import router as proyectos_router
+from app.api.v1.Tareas.router import router as tareas_router
 
 from app.core.db import Base, engine
 
@@ -41,6 +42,7 @@ def create_app()-> FastAPI:
     app.include_router(auth_router,prefix="/api/v1")
     app.include_router(alumno_router,prefix="/api/v1")
     app.include_router(proyectos_router, prefix="/api/v1")
+    app.include_router(tareas_router, prefix="/api/v1")
     app.include_router(upload_router)
   
     

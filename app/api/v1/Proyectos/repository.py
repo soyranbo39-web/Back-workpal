@@ -91,3 +91,37 @@ class ProyectoRepository:
     def update_application_status(self, application: ProyectoAlumno, status: str) -> ProyectoAlumno:
         application.status = status
         return application
+
+    def list_proyectos_unidos(self, alumno_id: int) -> list[Proyecto]:
+        # Get projects where status is 'pending' or 'accepted'
+        return (
+            self.db.query(Proyecto)
+            .join(ProyectoAlumno, Proyecto.id == ProyectoAlumno.proyecto_id)
+            .filter(ProyectoAlumno.alumno_id == alumno_id)
+            .filter(ProyectoAlumno.status.in_(["pending", "accepted"]))
+            .all()
+        )
+
+    def request_exit(self, proyecto_id: int, alumno_id: int):
+        application = (
+            self.db.query(ProyectoAlumno)
+            .filter(ProyectoAlumno.proyecto_id == proyecto_id, ProyectoAlumno.alumno_id == alumno_id)
+            .first()
+        )
+        if application:
+            application.exit_requested = True
+        return application
+
+    def get_exit_requests_by_project(self, proyecto_id: int) -> list[ProyectoAlumno]:
+        return (
+            self.db.query(ProyectoAlumno)
+            .filter(ProyectoAlumno.proyecto_id == proyecto_id, ProyectoAlumno.exit_requested == True)
+            .all()
+        )
+
+    def process_exit(self, application: ProyectoAlumno, accept: bool):
+        if accept:
+            self.db.delete(application)
+        else:
+            application.exit_requested = False
+        return application

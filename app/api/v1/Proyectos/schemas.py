@@ -29,6 +29,7 @@ class ProyectoAlumnoBase(BaseModel):
     proyecto_id: int
     alumno_id: int
     status: str = "pending"
+    exit_requested: bool = False
 
 class ProyectoAlumnoResponse(ProyectoAlumnoBase):
     id: int

@@ -1,4 +1,4 @@
-from sqlalchemy import Integer, ForeignKey, UniqueConstraint, String
+from sqlalchemy import Integer, ForeignKey, UniqueConstraint, String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.db import Base
 
@@ -13,3 +13,4 @@ class ProyectoAlumno(Base):
     proyecto_id: Mapped[int] = mapped_column(Integer, ForeignKey("Proyectos.id"), nullable=False)
     alumno_id: Mapped[int] = mapped_column(Integer, ForeignKey("Alumno.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending") # pending, accepted, rejected
+    exit_requested: Mapped[bool] = mapped_column(Boolean, default=False)
