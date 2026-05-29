@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Optional, cast
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -9,6 +9,7 @@ from app.api.v1.Alumnos.repository import AlumnoRepository
 from app.api.v1.Proyectos.schemas import ProyectoCreate, ProyectoResponse, ProyectoAlumnoResponse
 from app.core.db import get_db
 from app.core.security import get_current_user
+from app.services.file_storage import save_uploaded_image
 
 from app.api.v1.Tareas.repository import TareaRepository
 
@@ -144,9 +145,10 @@ async def list_proyectos(
 
 @router.post("/", response_model=ProyectoResponse)
 async def create_proyecto(
-    proyecto: ProyectoCreate,
-    db: Annotated[Session, Depends(get_db)],
-    user_id: Annotated[str, Depends(get_current_user)]
+    proyecto: Annotated[ProyectoCreate, Depends(ProyectoCreate.as_form)],
+    imagen: Annotated[Optional[UploadFile], File()] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
+    user_id: Annotated[str, Depends(get_current_user)] = None
 ):
     alumno_repo = AlumnoRepository(db)
     alumno = alumno_repo.get_alumno_by_user_id(user_id)
@@ -156,8 +158,24 @@ async def create_proyecto(
     repo = ProyectoRepository(db)
     proyecto.owner_id = alumno.id
 
+    saved : Optional[dict[str, str]] = None
     try:
-        created_proyecto = repo.create_proyecto(proyecto)
+        if imagen is not None:
+            saved = cast(dict[str, str], save_uploaded_image(imagen))
+        
+        imagen_url : str = saved["url"] if saved is not None else ""
+        
+        created_proyecto = repo.create_proyecto(
+            ProyectoCreate(
+                name=proyecto.name,
+                skill=proyecto.skill,
+                description=proyecto.description,
+                start=proyecto.start,
+                end=proyecto.end,
+                owner_id=proyecto.owner_id,
+                image=imagen_url
+            )
+        )
 
         db.commit()
         db.refresh(created_proyecto)
@@ -166,17 +184,10 @@ async def create_proyecto(
 
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error de integridad"
-        )
-
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error de integridad")
     except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al crear el proyecto"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al crear el proyecto")
 
 @router.post("/{proyecto_id}/aplicar", response_model=ProyectoAlumnoResponse)
 async def aplicar_a_proyecto(
@@ -233,7 +244,9 @@ async def list_aplicaciones(
             "alumno_id": app.alumno_id,
             "status": app.status,
             "alumno_name": f"{app_alumno.name} {app_alumno.last_name}" if app_alumno else "Desconocido",
-            "alumno_carrera": app_alumno.carrera if app_alumno else ""
+            "alumno_carrera": app_alumno.carrera if app_alumno else "",
+            "imagen_url": app_alumno.imagen_url if app_alumno else "",
+            "skills": app_alumno.skills if app_alumno else ""
         })
     return result
 
@@ -257,7 +270,8 @@ async def list_colaboradores(
             "alumno_id": col.alumno_id,
             "alumno_name": f"{col_alumno.name} {col_alumno.last_name}" if col_alumno else "Desconocido",
             "alumno_carrera": col_alumno.carrera if col_alumno else "",
-            "imagen_url": col_alumno.imagen_url if col_alumno else ""
+            "imagen_url": col_alumno.imagen_url if col_alumno else "",
+            "skills": col_alumno.skills if col_alumno else ""
         })
     return result
 
@@ -310,42 +324,34 @@ async def rechazar_aplicacion(
 @router.put("/{proyecto_id}", response_model=ProyectoResponse)
 async def update_proyecto(
     proyecto_id: int,
-    proyecto_data: ProyectoCreate,
-    db: Annotated[Session, Depends(get_db)],
+    proyecto_data: Annotated[ProyectoCreate, Depends(ProyectoCreate.as_form)],
+    imagen: Annotated[Optional[UploadFile], File()] = None,
+    db: Annotated[Session, Depends(get_db)] = None,
 ):
     repo = ProyectoRepository(db)
     proyecto = repo.get_proyecto_by_id(proyecto_id)
 
     if proyecto is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Proyecto no encontrado"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
 
     try:
-        updated_proyecto = repo.update_proyecto(
-            proyecto,
-            proyecto_data
-        )
+        if imagen is not None:
+            saved = cast(dict[str, str], save_uploaded_image(imagen))
+            proyecto_data.image = saved["url"]
+        else:
+            proyecto_data.image = proyecto.image
 
+        updated_proyecto = repo.update_proyecto(proyecto, proyecto_data)
         db.commit()
         db.refresh(updated_proyecto)
-
         return updated_proyecto
 
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Error de integridad"
-        )
-
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Error de integridad")
     except SQLAlchemyError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error al actualizar el proyecto"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error al actualizar el proyecto")
 
 @router.delete("/{proyecto_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_proyecto(
